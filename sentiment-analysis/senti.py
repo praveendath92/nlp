@@ -16,7 +16,7 @@ class Sentiment:
     batchSize = 24
     lstmUnits = 64
     numClasses = 2
-    iterations = 102
+    iterations = 100000
     numDimensions = 300
 
     def read_vocabulary(self, wordListFile="data/wordsList.npy", wordVectorFile="data/wordVectors.npy"):
@@ -89,7 +89,7 @@ class Sentiment:
     """
         Init tensorflow.
     """
-    def init_tf(self, lstm_keep_prob=1.0):
+    def init_tf(self):
         tf.reset_default_graph()
 
         self.labels = tf.placeholder(tf.float32, [None, self.numClasses])
@@ -118,16 +118,16 @@ class Sentiment:
     Init tf network for training.
     """
     def init_tf_train(self):
-        self.init_tf(lstm_keep_prob=0.75)
+        self.init_tf()
 
     """
     Init tf network for testing.
     """
     def init_tf_test(self):
-        self.init_tf(lstm_keep_prob=1.0)
+        self.init_tf()
 
 
-    def train_model_and_save(self, iterations=iterations, save_path="data/models/pretrained_lstm.ckpt"):
+    def train_batch(self, iterations=iterations, save_path="data/models/pretrained_lstm.ckpt"):
         self.init_tf_train()
         self.sess = tf.InteractiveSession()
         saver = tf.train.Saver(max_to_keep=5)
@@ -145,9 +145,23 @@ class Sentiment:
                 bar.update(i)
 
             # Save the network every 10,000 training iterations
-            if (i % 100 == 0 and i != 0):
-                savedpath = saver.save(self.sess, save_path, global_step=i)
-                print("saved to %s" % savedpath)
+            if (i % 1000 == 0 and i != 0):
+                saver.save(self.sess, save_path, global_step=i)
+
+
+    def train_single(self, sentence, expected_output, iterations=10, save_path="data/models/pretrained_lstm.ckpt"):
+        self.init_tf_train()
+        self.sess = tf.InteractiveSession()
+        self.sess.run(tf.global_variables_initializer())
+
+        print("Training on single example...")
+        sentence_vec = self.sentence_to_vec(sentence)
+        for i in range(iterations):
+            self.sess.run(self.optimizer, {self.input_data: sentence_vec, self.labels: [expected_output], self.lstmKeepProb:0.75})
+
+    def save_model(self, global_step, save_path="data/models/"):
+        saver = tf.train.Saver(max_to_keep=5)
+        saver.save(self.sess, save_path, global_step=global_step)
 
     def load_model(self, model_path="data/models/"):
         self.init_tf_test()
@@ -156,13 +170,13 @@ class Sentiment:
         saver.restore(self.sess, tf.train.latest_checkpoint(model_path))
 
 
-    def run_tests(self, iterations = 10):
+    def test_batch(self, iterations = 10):
         for i in range(iterations):
             nextBatch, nextBatchLabels = self.getTestBatch()
             print("Accuracy for this batch:",
                   (self.sess.run(self.accuracy, {self.input_data: nextBatch, self.labels: nextBatchLabels, self.lstmKeepProb: 1.0})) * 100)
 
-    def test(self, sentence):
+    def sentence_to_vec(self, sentence):
         cleanedLine = self.cleanup_sentence(sentence)
         split = cleanedLine.split()
         sentence_vec = np.zeros((1, self.maxSeqLength), dtype='int32')
@@ -175,6 +189,12 @@ class Sentiment:
             indexCounter = indexCounter + 1
             if indexCounter >= self.maxSeqLength:
                 break
+        return sentence_vec
+
+
+
+    def test_single(self, sentence):
+        sentence_vec = self.sentence_to_vec(sentence)
         print("Prediction:", self.sess.run(tf.argmax(self.prediction, 1), {self.input_data: sentence_vec, self.lstmKeepProb:1.0}))
 
     """
@@ -214,8 +234,8 @@ senti = Sentiment()
 senti.read_vocabulary()
 #senti.read_reviews_from_file()
 senti.read_reviews_from_cache()
-#senti.train_model_and_save()
+#senti.train_batch()
 senti.load_model()
-senti.run_tests()
-senti.test("I am not good")
-senti.test("I am very good. I am amazing really. This should be positive right?")
+senti.test_batch()
+senti.test_single("I am not good")
+senti.test_single("I am very good. I am amazing really. This should be positive right?")
