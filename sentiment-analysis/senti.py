@@ -12,13 +12,14 @@ Sentiment analyses.
 class Sentiment:
     strip_special_chars = re.compile("[^A-Za-z0-9 ]+")
     maxSeqLength = 250
+    totalSize = 30000
     batchSize = 24
     lstmUnits = 64
     numClasses = 2
-    iterations = 500
+    iterations = 102
     numDimensions = 300
 
-    def read_words(self, wordListFile="data/wordsList.npy", wordVectorFile="data/wordVectors.npy"):
+    def read_vocabulary(self, wordListFile="data/wordsList.npy", wordVectorFile="data/wordVectors.npy"):
         wordsList = np.load(wordListFile)
         print('Loaded the word list!')
         wordsList = wordsList.tolist()  # Originally loaded as numpy array
@@ -88,17 +89,17 @@ class Sentiment:
     """
         Init tensorflow.
     """
-    def init_tf(self):
+    def init_tf(self, lstm_keep_prob=1.0):
         tf.reset_default_graph()
 
-        self.labels = tf.placeholder(tf.float32, [self.batchSize, self.numClasses])
-        self.input_data = tf.placeholder(tf.int32, [self.batchSize, self.maxSeqLength])
+        self.labels = tf.placeholder(tf.float32, [None, self.numClasses])
+        self.input_data = tf.placeholder(tf.int32, [None, self.maxSeqLength])
+        self.lstmKeepProb = tf.placeholder(tf.float32)
 
-        data = tf.Variable(tf.zeros([self.batchSize, self.maxSeqLength, self.numDimensions]), dtype=tf.float32)
         data = tf.nn.embedding_lookup(self.wordVectors, self.input_data)
 
         lstmCell = tf.contrib.rnn.BasicLSTMCell(self.lstmUnits)
-        lstmCell = tf.contrib.rnn.DropoutWrapper(cell=lstmCell, output_keep_prob=0.75)
+        lstmCell = tf.contrib.rnn.DropoutWrapper(cell=lstmCell, output_keep_prob=self.lstmKeepProb)
         value, _ = tf.nn.dynamic_rnn(lstmCell, data, dtype=tf.float32)
 
         weight = tf.Variable(tf.truncated_normal([self.lstmUnits, self.numClasses]))
@@ -113,11 +114,23 @@ class Sentiment:
         loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.prediction, labels=self.labels))
         self.optimizer = tf.train.AdamOptimizer().minimize(loss)
 
+    """
+    Init tf network for training.
+    """
+    def init_tf_train(self):
+        self.init_tf(lstm_keep_prob=0.75)
 
-    def train_model_full(self, iterations=iterations, save_path="data/models/pretrained_lstm.ckpt"):
-        self.init_tf()
+    """
+    Init tf network for testing.
+    """
+    def init_tf_test(self):
+        self.init_tf(lstm_keep_prob=1.0)
+
+
+    def train_model_and_save(self, iterations=iterations, save_path="data/models/pretrained_lstm.ckpt"):
+        self.init_tf_train()
         self.sess = tf.InteractiveSession()
-        saver = tf.train.Saver()
+        saver = tf.train.Saver(max_to_keep=5)
         self.sess.run(tf.global_variables_initializer())
 
         bar = progressbar.ProgressBar(max_value=iterations)
@@ -125,19 +138,19 @@ class Sentiment:
         for i in range(iterations):
             # Next Batch of reviews
             nextBatch, nextBatchLabels = self.getTrainBatch()
-            self.sess.run(self.optimizer, {self.input_data: nextBatch, self.labels: nextBatchLabels})
+            self.sess.run(self.optimizer, {self.input_data: nextBatch, self.labels: nextBatchLabels, self.lstmKeepProb:0.75})
 
             # Write summary to Tensorboard
-            if (i % 20 == 0):
+            if (i % 5 == 0):
                 bar.update(i)
 
             # Save the network every 10,000 training iterations
-            if (i % 10 == 0 and i != 0):
+            if (i % 100 == 0 and i != 0):
                 savedpath = saver.save(self.sess, save_path, global_step=i)
                 print("saved to %s" % savedpath)
 
-    def load_pretrained_model(self, model_path="data/models"):
-        self.init_tf()
+    def load_model(self, model_path="data/models/"):
+        self.init_tf_test()
         self.sess = tf.InteractiveSession()
         saver = tf.train.Saver()
         saver.restore(self.sess, tf.train.latest_checkpoint(model_path))
@@ -147,12 +160,12 @@ class Sentiment:
         for i in range(iterations):
             nextBatch, nextBatchLabels = self.getTestBatch()
             print("Accuracy for this batch:",
-                  (self.sess.run(self.accuracy, {self.input_data: nextBatch, self.labels: nextBatchLabels})) * 100)
+                  (self.sess.run(self.accuracy, {self.input_data: nextBatch, self.labels: nextBatchLabels, self.lstmKeepProb: 1.0})) * 100)
 
     def test(self, sentence):
         cleanedLine = self.cleanup_sentence(sentence)
         split = cleanedLine.split()
-        sentence_vec = np.zeros((self.batchSize, self.maxSeqLength), dtype='int32')
+        sentence_vec = np.zeros((1, self.maxSeqLength), dtype='int32')
         indexCounter = 0
         for word in split:
             try:
@@ -162,8 +175,7 @@ class Sentiment:
             indexCounter = indexCounter + 1
             if indexCounter >= self.maxSeqLength:
                 break
-        print(sentence_vec)
-        print("Prediction:", self.sess.run(tf.argmax(self.prediction, 1), {self.input_data: sentence_vec}))
+        print("Prediction:", self.sess.run(tf.argmax(self.prediction, 1), {self.input_data: sentence_vec, self.lstmKeepProb:1.0}))
 
     """
         Cleanup sentence.
@@ -199,20 +211,11 @@ class Sentiment:
 
 
 senti = Sentiment()
-senti.read_words()
+senti.read_vocabulary()
 #senti.read_reviews_from_file()
 senti.read_reviews_from_cache()
-senti.load_pretrained_model()
-#senti.train_model()
+#senti.train_model_and_save()
+senti.load_model()
 senti.run_tests()
 senti.test("I am not good")
-senti.test("I am not good")
-senti.test("I am not good")
-senti.test("I am not good")
-senti.test("I am not good")
-senti.test("I am not good")
-senti.test("I am not good")
-senti.test("I am not good")
-senti.test("I am not good")
-senti.test("I am not good")
-senti.test("I am not good")
+senti.test("I am very good. I am amazing really. This should be positive right?")
