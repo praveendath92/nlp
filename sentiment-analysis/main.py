@@ -15,9 +15,9 @@ def process_command(cmd, data):
     elif cmd == "trainSingle":
         type,sentence = data.split(" ", 1)
         if type == "pos":
-            senti.test_single(sentence=sentence,prediction=1)
+            senti.train_single(sentence=sentence,expected_output=1)
         elif type == "neg":
-            senti.test_single(sentence=sentence,prediction=0)
+            senti.train_single(sentence=sentence,expected_output=0)
         else:
             print("Unknown sentiment type")
     elif cmd == "loadModel":

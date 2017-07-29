@@ -149,15 +149,12 @@ class Sentiment:
                 saver.save(self.sess, save_path, global_step=i)
 
 
-    def train_single(self, sentence, expected_output, iterations=10, save_path="data/models/pretrained_lstm.ckpt"):
-        self.init_tf_train()
-        self.sess = tf.InteractiveSession()
-        self.sess.run(tf.global_variables_initializer())
-
+    def train_single(self, sentence, expected_output, iterations=10):
         print("Training on single example...")
         sentence_vec = self.sentence_to_vec(sentence)
+        labels = [0, 1] if expected_output == 0 else [1, 0]
         for i in range(iterations):
-            self.sess.run(self.optimizer, {self.input_data: sentence_vec, self.labels: [expected_output], self.lstmKeepProb:0.75})
+            self.sess.run(self.optimizer, {self.input_data: sentence_vec, self.labels: [labels], self.lstmKeepProb:0.75})
 
     def save_model(self, global_step, save_path="data/models/pretrained_lstm.ckpt"):
         saver = tf.train.Saver(max_to_keep=5)
@@ -193,10 +190,14 @@ class Sentiment:
 
 
 
-    def test_single(self, sentence, prediction):
+    def test_single(self, sentence):
         sentence_vec = self.sentence_to_vec(sentence)
-        print("Prediction:", self.sess.run(tf.argmax(self.prediction, prediction),
-                                           {self.input_data: sentence_vec, self.lstmKeepProb:1.0}))
+        prediction = self.sess.run(tf.argmax(self.prediction, 1),
+                                           {self.input_data: sentence_vec, self.lstmKeepProb:1.0})
+        if prediction[0] == 1:
+            print("Negative")
+        else:
+            print("Positive")
 
     """
         Cleanup sentence.
