@@ -149,7 +149,7 @@ class Sentiment:
                 saver.save(self.sess, save_path, global_step=i)
 
 
-    def train_single(self, sentence, expected_output, iterations=10):
+    def train_single(self, sentence, expected_output, iterations=2):
         print("Training on single example...")
         sentence_vec = self.sentence_to_vec(sentence)
         labels = [0, 1] if expected_output == 0 else [1, 0]
