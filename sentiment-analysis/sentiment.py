@@ -159,7 +159,7 @@ class Sentiment:
         for i in range(iterations):
             self.sess.run(self.optimizer, {self.input_data: sentence_vec, self.labels: [expected_output], self.lstmKeepProb:0.75})
 
-    def save_model(self, global_step, save_path="data/models/"):
+    def save_model(self, global_step, save_path="data/models/pretrained_lstm.ckpt"):
         saver = tf.train.Saver(max_to_keep=5)
         saver.save(self.sess, save_path, global_step=global_step)
 

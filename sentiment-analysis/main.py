@@ -25,6 +25,8 @@ def process_command(cmd, data):
             senti.load_model(model_path=data)
         else:
             senti.load_model()
+    elif cmd == "saveModel":
+        senti.save_model(global_step=int(data))
     elif cmd == "testBatch":
         senti.test_batch()
     elif cmd == "testSingle":
@@ -42,8 +44,9 @@ def print_commands():
     print("4. trainSingle pos <positive sentence>")
     print("5. trainSingle neg <negative sentence>")
     print("6. loadModel <optional-model-path>")
-    print("7. testBatch")
-    print("8. testSingle <Review text>")
+    print("7. saveModel <global-step-num>")
+    print("8. testBatch")
+    print("9. testSingle <Review text>")
     print("-------------------------------------")
 
 print("Enter a command")
@@ -52,6 +55,8 @@ while True:
     usr_input = input().strip().split(' ', 1)
     if len(usr_input) == 2:
         cmd,data = usr_input
+    elif len(usr_input) == 1:
+        cmd,data = usr_input[0],None
     else:
-        cmd,data = usr_input,None
+        cmd,data = None,None
     process_command(cmd=cmd, data=data)
