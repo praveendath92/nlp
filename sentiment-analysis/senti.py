@@ -137,7 +137,7 @@ class Sentiment:
         print("Training ...")
         for i in range(iterations):
             # Next Batch of reviews
-            nextBatch, nextBatchLabels = self.getTrainBatch()
+            nextBatch, nextBatchLabels = self.getTrainBatch(i)
             self.sess.run(self.optimizer, {self.input_data: nextBatch, self.labels: nextBatchLabels, self.lstmKeepProb:0.75})
 
             # Write summary to Tensorboard
@@ -204,15 +204,16 @@ class Sentiment:
         sentence = sentence.lower().replace("<br />", " ")
         return re.sub(self.strip_special_chars, "", sentence.lower())
 
-    def getTrainBatch(self, batchSize=batchSize):
+    def getTrainBatch(self, iteration, batchSize=batchSize):
         labels = []
         arr = np.zeros([batchSize, self.maxSeqLength])
         for i in range(batchSize):
-            if (i % 2 == 0):
-                num = randint(1, 11499)
+            ind = iteration + i
+            if (ind % 2 == 0):
+                num = 1 + int(ind/2) % 11499
                 labels.append([1, 0])
             else:
-                num = randint(13499, 24999)
+                num = 13500 + (int(ind/2) % 11499)
                 labels.append([0, 1])
             arr[i] = self.ids[num - 1:num]
         return arr, labels
@@ -234,7 +235,7 @@ senti = Sentiment()
 senti.read_vocabulary()
 #senti.read_reviews_from_file()
 senti.read_reviews_from_cache()
-#senti.train_batch()
+senti.train_batch()
 senti.load_model()
 senti.test_batch()
 senti.test_single("I am not good")
